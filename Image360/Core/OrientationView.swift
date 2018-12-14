@@ -26,7 +26,7 @@ import UIKit
 
 /// ## OrientationView
 /// The `OrientationView` displays current camera position.
-internal class OrientationView: UIView {
+public class OrientationView: UIView {
     private let lineWidth: CGFloat = 3.0
     private let dotSize: CGFloat = 6.0
     
@@ -49,35 +49,34 @@ internal class OrientationView: UIView {
         if let context = UIGraphicsGetCurrentContext() {
             context.clear(rect)
             context.beginPath()
+            
             if let backgroundColor = _backgroundColor {
                 context.setFillColor(backgroundColor.cgColor)
                 context.fillEllipse(in: rect)
             }
             
             if let tintColor = tintColor {
-                context.setFillColor(tintColor.cgColor)
-                context.fillEllipse(in: CGRect(origin: CGPoint(x: rect.midX - dotSize / 2 ,
-                                                               y: rect.midY - dotSize / 2),
-                                               size: CGSize(width: dotSize, height: dotSize)
-                    )
-                )
+                let center = CGPoint(x: rect.midX, y: rect.midY)
                 
+                context.setFillColor(tintColor.cgColor)
                 context.setStrokeColor(tintColor.cgColor)
                 context.setLineCap(.round)
                 context.setLineWidth(lineWidth)
                 
-                let center = CGPoint(x: rect.midX, y: rect.midY)
+                // starting point
+                context.move(to: center)
                 
+                // arc line
                 context.addArc(center: center,
-                               radius: rect.width / 2 - lineWidth,
+                               radius: rect.width/2.75,
                                startAngle: orientationAngle - CGFloat.pi / 2 - fieldOfView / 2,
                                endAngle: orientationAngle - CGFloat.pi / 2 + fieldOfView / 2,
                                clockwise: false)
                 
-                context.addLines(between: [CGPoint(x: center.x - dotSize / 8, y: center.y - dotSize / 4),
-                                           CGPoint(x: center.x, y: center.y - dotSize / 2),
-                                           CGPoint(x: center.x + dotSize / 8, y: center.y - dotSize / 4),
-                    ])
+                // connect end of arc to the center point
+                context.addLine(to: CGPoint(x: center.x, y: center.y))
+                
+                context.fillPath()
             }
             
             context.strokePath()

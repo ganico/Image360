@@ -45,6 +45,7 @@ class ViewController: UIViewController {
                 if let destination = segue.destination as? Image360Controller {
                     self.image360Controller = destination
                     self.image360Controller.imageView.observer = self
+                    self.image360Controller.imageView.touchPointHandler = self
                 }
             case "settings":
                 if let destination = segue.destination as? SettingsController {
@@ -73,6 +74,7 @@ class ViewController: UIViewController {
             assertionFailure("Unexpected controller's type")
             return
         }
+        
         image360Controller.inertia = settingsController.inertia
         pictureSegmentedControl.selectedSegmentIndex = settingsController.pictureIndex
         image360Controller.isOrientationViewHidden = settingsController.isOrientationViewHidden
@@ -132,6 +134,7 @@ class ViewController: UIViewController {
 
 // MARK: - Image360ViewObserver
 extension ViewController: Image360ViewObserver {
+    
     func image360View(_ view: Image360View, didChangeFOV cameraFov: Float) {
 
     }
@@ -143,4 +146,13 @@ extension ViewController: Image360ViewObserver {
     func image360View(_ view: Image360View, didRotateOverXZ rotationAngleXZ: Float) {
         angleXZSlider.value = (rotationAngleXZ - view.rotationAngleXZMin) / (view.rotationAngleXZMax - view.rotationAngleXZMin)
     }
+    
+}
+
+extension ViewController: Image360ViewTouchPointHandler {
+    
+    func image360ViewVectorPoint(x: Float, y: Float, z: Float) {
+        print("touch point x: \(x), y: \(y), z: \(z)")
+    }
+    
 }

@@ -26,6 +26,10 @@
 import UIKit
 import GLKit
 
+public protocol Image360ViewTouchPointHandler: class {
+    func image360ViewVectorPoint(x: Float, y: Float, z: Float)
+}
+
 protocol Image360ViewTouchesHandler: class {
     func image360View(_ view: Image360View, touchesBegan touches: Set<UITouch>, with event: UIEvent?)
     func image360View(_ view: Image360View, touchesMoved touches: Set<UITouch>, with event: UIEvent?)
@@ -49,7 +53,7 @@ public protocol Image360ViewObserver: class {
 /// 
 /// You could change current dysplayed image via `image` property.
 /// Control view utput via `rotationAngleXZ`, `rotationAngleY` and `cameraFovDegree` properties.
-public class Image360View: GLKView {
+open class Image360View: GLKView {
     // MARK: Sphere data
     private var spheres = [Sphere?].init(repeating: nil, count: 2)
 
@@ -168,6 +172,7 @@ public class Image360View: GLKView {
 
     weak var touchesHandler: Image360ViewTouchesHandler?
     public weak var observer: Image360ViewObserver?
+    public weak var touchPointHandler: Image360ViewTouchPointHandler?
     
     weak var orientationView: OrientationView?
 
@@ -200,7 +205,7 @@ public class Image360View: GLKView {
         unloadTextures()
     }
     
-    public override func layoutSubviews() {
+    open override func layoutSubviews() {
         super.layoutSubviews()
         viewAspectRatio = frame.size.width / frame.size.height
     }
@@ -242,7 +247,7 @@ public class Image360View: GLKView {
     }
 
     /// Redraw method.
-    public override func draw(_ rect: CGRect) {
+    open override func draw(_ rect: CGRect) {
         EAGLContext.setCurrent(self.context)
         
         projectionMatrix = GLKMatrix4Identity
@@ -256,7 +261,7 @@ public class Image360View: GLKView {
                                              sin(rotationAngleXZ) * cos(rotationAngleY)))
 
         projectionMatrix = GLKMatrix4MakePerspective(GLKMathDegreesToRadians(cameraFovDegree),
-                                                     Float(viewAspectRatio),
+                                                     Float(2.0),//Float(viewAspectRatio),
                                                      zNear,
                                                      zFar)
         lookAtMatrix = GLKMatrix4MakeLookAt(cameraPosition.x, cameraPosition.y, cameraPosition.z,
@@ -291,15 +296,52 @@ public class Image360View: GLKView {
         glDisableVertexAttribArray(aUV)
     }
 
-    override public func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+    override open func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         touchesHandler?.image360View(self, touchesBegan: touches, with: event)
+        
+        // Computation for scene touch point
+        if let touch = touches.first {
+            var testResult = false
+            
+            // Get the view port reference
+            var viewport = [Int32]([0, 0, 0, 0])
+            glGetIntegerv(GLenum(GL_VIEWPORT), &viewport)
+            
+            // For consitent value (either iphone / ipad)
+            let tapLocation = touch.location(in: self)
+            let tapLocationX = Float(tapLocation.x * UIScreen.main.scale)
+            let tapLocationY = Float((tapLocation.y * UIScreen.main.scale) - CGFloat(viewport[3])) * -1
+            
+            // Compute near & far points
+            let nearVector = GLKVector3Make(tapLocationX, tapLocationY, 0.0)
+            let nearPoint = GLKMathUnproject(nearVector, lookAtMatrix, projectionMatrix, &viewport[0], &testResult)
+            
+            let farVector = GLKVector3Make(tapLocationX, tapLocationY, 1.0)
+            let farPoint = GLKMathUnproject(farVector, lookAtMatrix, projectionMatrix, &viewport[0], &testResult)
+            
+            // Compute view vector
+            let viewVector = GLKVector3Subtract(farPoint, nearPoint)
+            //print("viewVector x: \(viewVector.x) y: \(viewVector.y) z: \(viewVector.z)") // for debugging purposes
+            
+            // Normalize view vector
+            let vectorLength = sqrt(viewVector.x*viewVector.x + viewVector.y*viewVector.y + viewVector.z*viewVector.z)
+            let normalizedViewVector = GLKVector3(v: (viewVector.x/vectorLength, viewVector.y/vectorLength, viewVector.z/vectorLength))
+            
+            // Scale normalized vector to find scene point
+            let scale: Float = 100
+            let scenePoint = GLKVector3(v: (normalizedViewVector.x*scale, normalizedViewVector.y*scale, normalizedViewVector.z*scale))
+            
+            //print("normalized scale point x: \(scenePoint.x) y: \(scenePoint.y) z: \(scenePoint.z)") // for debugging purposes
+            
+            touchPointHandler?.image360ViewVectorPoint(x: scenePoint.x, y: scenePoint.y, z: scenePoint.z)
+        }
     }
 
-    override public func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+    override open func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         touchesHandler?.image360View(self, touchesMoved: touches, with: event)
     }
 
-    override public func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+    override open func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         touchesHandler?.image360View(self, touchesEnded: touches, with: event)
     }
 
